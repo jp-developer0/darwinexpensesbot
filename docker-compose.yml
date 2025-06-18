@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: expense_bot_db
+    environment:
+      POSTGRES_DB: expense_bot
+      POSTGRES_USER: expense_user
+      POSTGRES_PASSWORD: expense_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U expense_user -d expense_bot"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Bot Service (Python)
+  bot-service:
+    build: 
+      context: ./bot-service
+      dockerfile: Dockerfile
+    container_name: expense_bot_service
+    environment:
+      DATABASE_URL: postgresql://expense_user:expense_password@postgres:5432/expense_bot
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      BOT_SERVICE_HOST: 0.0.0.0
+      BOT_SERVICE_PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./bot-service/logs:/app/logs
+
+  # Connector Service (Node.js)
+  connector-service:
+    build:
+      context: ./connector-service
+      dockerfile: Dockerfile
+    container_name: expense_connector_service
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      WEBHOOK_URL: ${WEBHOOK_URL}
+      BOT_SERVICE_URL: http://bot-service:8000
+      PORT: 3000
+      NODE_ENV: production
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - bot-service
+    restart: unless-stopped
+    volumes:
+      - ./connector-service/logs:/app/logs
+
+volumes:
+  postgres_data: 
