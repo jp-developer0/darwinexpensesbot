@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from config import settings
 import logging
+import ssl
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +15,17 @@ class DatabaseManager:
     async def connect(self):
         """Initialize database connection pool"""
         try:
+            # Create SSL context for Supabase connection
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
             self.pool = await asyncpg.create_pool(
                 settings.database_url,
                 min_size=1,
                 max_size=10,
-                command_timeout=60
+                command_timeout=60,
+                ssl=ssl_context
             )
             logger.info("Database connection pool created successfully")
         except Exception as e:

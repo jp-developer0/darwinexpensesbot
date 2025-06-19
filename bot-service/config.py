@@ -18,7 +18,6 @@ class Settings(BaseSettings):
     huggingface_api_key: Optional[str] = None
     
     class Config:
-        env_file = ".env"
         case_sensitive = False
 
 
