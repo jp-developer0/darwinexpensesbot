@@ -1,289 +1,356 @@
-# Connector Service - Telegram Expense Bot
+# Connector Service 🔌
 
-Node.js service that interfaces with the Telegram API and forwards messages to the Bot Service for processing.
+The Node.js service that handles Telegram bot integration and forwards messages to the Bot Service for AI processing.
 
-## Features
+## 🚀 Features
 
-- 🤖 Telegram Bot API integration with webhook and polling support
-- 🔗 HTTP client for Bot Service communication
-- 🚀 Express.js server with TypeScript
-- 📱 Webhook endpoint for production deployments
-- 🔄 Polling mode for development
-- 🛡️ Security middleware (Helmet, CORS)
-- 📝 Comprehensive logging with Winston
-- ⚡ Graceful shutdown handling
+- **Telegram Integration**: Full webhook and polling support
+- **Message Routing**: Forwards user messages to Bot Service
+- **Error Handling**: Robust error management and logging
+- **TypeScript**: Type-safe development with modern ES modules
+- **Production Ready**: Express.js with comprehensive middleware
+- **Docker Support**: Containerized deployment
 
-## Requirements
+## 🏗️ Architecture
 
-- Node.js 18+ (LTS)
-- Telegram Bot Token (from @BotFather)
-- Running Bot Service instance
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  Telegram API   │───▶│ Connector Service │───▶│   Bot Service   │
+│   (Webhooks)    │    │    (Node.js)     │    │    (Python)     │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         │                        │                        │
+         ▼                        ▼                        ▼
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   User Events   │    │   HTTP Routing   │    │ AI Processing   │
+│   & Messages    │    │   & Validation   │    │ & Storage       │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+```
 
-## Installation
+## 📁 Project Structure
 
-1. Install dependencies:
+```
+connector-service/
+├── src/
+│   ├── index.ts         # Application entry point
+│   ├── server.ts        # Express server setup
+│   ├── telegramBot.ts   # Telegram bot logic
+│   ├── botService.ts    # Bot service client
+│   ├── config.ts        # Configuration management
+│   ├── logger.ts        # Logging utilities
+│   └── types.ts         # TypeScript type definitions
+├── package.json         # Dependencies and scripts
+├── tsconfig.json        # TypeScript configuration
+└── Dockerfile          # Container configuration
+```
+
+## 🛠️ Development
+
+### Local Setup
+
+1. **Install Dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Environment Configuration**
+   ```bash
+   export TELEGRAM_BOT_TOKEN="your_bot_token"
+   export BOT_SERVICE_URL="http://localhost:8000"
+   export PORT="3000"
+   export NODE_ENV="development"
+   ```
+
+3. **Development Mode**
+   ```bash
+   npm run dev
+   ```
+
+4. **Production Build**
+   ```bash
+   npm run build
+   npm start
+   ```
+
+### Docker
+
 ```bash
-npm install
+# Build image
+docker build -t expense-connector-service .
+
+# Run container
+docker run -p 3000:3000 \
+  -e TELEGRAM_BOT_TOKEN="your_bot_token" \
+  -e BOT_SERVICE_URL="http://localhost:8000" \
+  expense-connector-service
 ```
 
-2. Set up environment variables:
+## 📊 API Endpoints
+
+### Health Check
+```http
+GET /health
+```
+Returns service status and version.
+
+### Telegram Webhook
+```http
+POST /webhook
+Content-Type: application/json
+
+{
+  "message": {
+    "from": { "id": 123456789 },
+    "text": "Pizza $20"
+  }
+}
+```
+
+Processes incoming Telegram messages and forwards to Bot Service.
+
+## 🤖 Telegram Bot Integration
+
+### Webhook Configuration
+
+The service automatically configures the Telegram webhook:
+
+```typescript
+// Webhook setup
+await bot.telegram.setWebhook(`${config.webhookUrl}/webhook`, {
+  secret_token: config.webhookSecret
+});
+```
+
+### Message Processing Flow
+
+1. **Receive**: Telegram sends webhook to `/webhook`
+2. **Validate**: Check message format and user
+3. **Forward**: Send to Bot Service for AI processing
+4. **Respond**: Return processed result to user
+
+### Bot Commands
+
+- `/start` - Welcome message and instructions
+- `/help` - Usage instructions and examples
+- Regular messages - Processed as expense data
+
+## 🔧 Configuration
+
+### Environment Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather | - | ✅ |
+| `BOT_SERVICE_URL` | Bot service endpoint | `http://localhost:8000` | ✅ |
+| `WEBHOOK_URL` | Public webhook URL | - | Production only |
+| `WEBHOOK_SECRET` | Webhook security token | - | Production only |
+| `PORT` | Service port | `3000` | ❌ |
+| `NODE_ENV` | Environment mode | `development` | ❌ |
+
+### TypeScript Configuration
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
+```
+
+## 🔄 Message Flow
+
+### Incoming Message Processing
+
+```typescript
+// 1. Receive webhook
+app.post('/webhook', (req, res) => {
+  const update = req.body;
+  
+  // 2. Extract message data
+  const message = update.message?.text;
+  const telegramId = update.message?.from?.id;
+  
+  // 3. Forward to Bot Service
+  const response = await botService.processMessage({
+    message,
+    telegram_id: telegramId.toString()
+  });
+  
+  // 4. Send response to user
+  await bot.telegram.sendMessage(telegramId, response.message);
+});
+```
+
+### Error Handling
+
+- **Network Errors**: Retry logic with exponential backoff
+- **Invalid Messages**: Graceful error responses
+- **Bot Service Unavailable**: Fallback error messages
+- **Rate Limiting**: Telegram API rate limit handling
+
+## 📝 Logging
+
+### Structured Logging
+
+```typescript
+// Log levels: error, warn, info, debug
+logger.info('Processing message', {
+  telegramId,
+  messageLength: message.length,
+  timestamp: new Date().toISOString()
+});
+```
+
+### Log Output
+
+```
+2024-01-15 10:30:15 [INFO] Processing message for user 123456789
+2024-01-15 10:30:16 [INFO] Bot service response: Food expense added ✅
+2024-01-15 10:30:16 [INFO] Message sent to user successfully
+```
+
+## 🧪 Testing
+
+### Manual Testing
+
 ```bash
-cp env.example .env
-# Edit .env with your configuration
+# Check service health
+curl http://localhost:3000/health
+
+# Test webhook (simulate Telegram)
+curl -X POST "http://localhost:3000/webhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": {
+      "from": {"id": 123456789},
+      "text": "Pizza $20"
+    }
+  }'
 ```
 
-3. Build the project:
-```bash
-npm run build
+### Integration Testing
+
+1. **Start Services**: Both connector and bot services
+2. **Send Message**: Via Telegram or webhook
+3. **Verify Response**: Check user receives confirmation
+4. **Check Database**: Verify expense was stored
+
+## 🔒 Security
+
+### Webhook Security
+
+- **Secret Token**: Validates webhook authenticity
+- **HTTPS Only**: Production webhooks use SSL
+- **Rate Limiting**: Protection against spam
+- **Input Validation**: Sanitize all incoming data
+
+### Best Practices
+
+```typescript
+// Validate webhook secret
+if (req.headers['x-telegram-bot-api-secret-token'] !== config.webhookSecret) {
+  return res.status(401).send('Unauthorized');
+}
+
+// Sanitize message content
+const sanitizedMessage = message.trim().substring(0, 1000);
 ```
 
-## Configuration
+## 🚀 Deployment
 
-Create a `.env` file with the following variables:
+### Production Considerations
 
-```env
-# Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-WEBHOOK_URL=https://your-domain.com/webhook
+1. **Environment**: Set `NODE_ENV=production`
+2. **Webhook URL**: Must be HTTPS endpoint
+3. **Error Monitoring**: Use service like Sentry
+4. **Load Balancing**: Multiple instances for scaling
+5. **Health Checks**: Monitor `/health` endpoint
 
-# Bot Service Configuration
-BOT_SERVICE_URL=http://localhost:8000
+### Docker Deployment
 
-# Server Configuration
-PORT=3000
-NODE_ENV=development
-
-# Webhook Configuration (optional)
-WEBHOOK_SECRET=your_webhook_secret_here
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY dist/ ./dist/
+EXPOSE 3000
+CMD ["npm", "start"]
 ```
 
-### Getting a Telegram Bot Token
+## 📊 Monitoring
 
-1. Message @BotFather on Telegram
-2. Send `/newbot` command
-3. Follow the instructions to create your bot
-4. Copy the bot token to your `.env` file
+### Health Monitoring
 
-## Running the Service
-
-### Development (with polling)
-```bash
-npm run dev
+```http
+GET /health
 ```
-
-### Production (with webhook)
-```bash
-npm start
-```
-
-## Deployment Modes
-
-### Polling Mode (Development)
-- Suitable for development and testing
-- No webhook URL required
-- Bot polls Telegram for updates
-- Enabled when `WEBHOOK_URL` is not set
-
-### Webhook Mode (Production)
-- Recommended for production
-- Requires HTTPS endpoint
-- More efficient than polling
-- Set `WEBHOOK_URL` in environment variables
-
-## API Endpoints
-
-### GET `/health`
-Health check endpoint.
 
 **Response:**
 ```json
 {
   "status": "healthy",
   "service": "connector-service",
-  "timestamp": "2024-01-01T00:00:00.000Z"
+  "uptime": "2h 15m 30s",
+  "botServiceStatus": "connected"
 }
 ```
 
-### POST `/webhook`
-Telegram webhook endpoint (only used in webhook mode).
+### Metrics
 
-### GET `/bot-info`
-Get Telegram bot information.
+- **Message Volume**: Messages processed per minute
+- **Response Time**: Bot service response latency
+- **Error Rate**: Failed message processing percentage
+- **Uptime**: Service availability metrics
 
-**Response:**
-```json
-{
-  "bot": {
-    "id": 123456789,
-    "is_bot": true,
-    "first_name": "ExpenseBot",
-    "username": "your_expense_bot"
-  }
-}
-```
+## 🔧 Dependencies
 
-### POST `/setup-webhook`
-Setup Telegram webhook (call once when deploying).
+### Core Dependencies
 
-### DELETE `/webhook`
-Remove Telegram webhook.
+- **Express**: Web framework
+- **Telegraf**: Telegram bot framework
+- **Axios**: HTTP client for bot service
+- **Winston**: Logging library
+- **TypeScript**: Type safety
 
-### POST `/add-user/:telegramId`
-Information about adding users to whitelist.
+### Development
 
-## Bot Service Communication
-
-The Connector Service communicates with the Bot Service via HTTP:
-
-- **Endpoint**: `POST {BOT_SERVICE_URL}/process-message`
-- **Request**: `{ "message": "Pizza 20 bucks", "telegram_id": "123456789" }`
-- **Response**: `{ "success": true, "message": "Food expense added ✅", "expense_added": true, "category": "Food" }`
-
-## Message Flow
-
-1. User sends message to Telegram bot
-2. Telegram delivers message via webhook or polling
-3. Connector Service receives message
-4. Connector Service forwards to Bot Service
-5. Bot Service processes and responds
-6. Connector Service sends response back to user
-
-## Error Handling
-
-- **Bot Service unavailable**: Falls back to error message
-- **Invalid webhook secret**: Returns 401 Unauthorized
-- **Telegram API errors**: Logged and handled gracefully
-- **Unhandled exceptions**: Logged and service restarts
-
-## Logging
-
-Logs are written to:
-- `logs/error.log` - Error level logs
-- `logs/combined.log` - All logs
-- Console (in development)
-
-Log levels:
-- `error`: Critical errors
-- `warn`: Warning conditions
-- `info`: General information
-- `debug`: Debug information (development only)
-
-## Development
-
-### Project Structure
-```
-src/
-├── config.ts       # Configuration management
-├── logger.ts       # Winston logger setup
-├── types.ts        # TypeScript interfaces
-├── botService.ts   # Bot Service HTTP client
-├── telegramBot.ts  # Telegram bot handler
-├── server.ts       # Express server
-└── index.ts        # Main entry point
-```
-
-### Scripts
 ```bash
-npm run dev         # Development with hot reload
-npm run build       # Build TypeScript
-npm run start       # Start production server
-npm run lint        # Run ESLint
-npm run format      # Format code with Prettier
-npm run clean       # Clean build directory
+# Install dev dependencies
+npm install --save-dev @types/node ts-node nodemon
+
+# Run linting
+npm run lint
+
+# Type checking
+npm run type-check
 ```
 
-### TypeScript Configuration
-- **Target**: ES2022
-- **Module**: ESNext (native ES modules)
-- **Strict mode**: Enabled
-- **Source maps**: Generated
-
-## Production Deployment
-
-### Environment Setup
-1. Set `NODE_ENV=production`
-2. Configure `WEBHOOK_URL` with your domain
-3. Set up HTTPS endpoint
-4. Configure `WEBHOOK_SECRET` for security
-
-### Webhook Setup
-After deployment, setup the webhook:
-```bash
-curl -X POST https://your-domain.com/setup-webhook
-```
-
-### Health Monitoring
-Monitor the service using:
-- Health endpoint: `GET /health`
-- Log files in `logs/` directory
-- Process monitoring (PM2, systemd, etc.)
-
-### Using Docker
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY dist ./dist
-CMD ["node", "dist/index.js"]
-```
-
-### Using PM2
-```bash
-npm install -g pm2
-pm2 start dist/index.js --name telegram-connector
-pm2 startup
-pm2 save
-```
-
-## Security
-
-- **Webhook secret verification**: Validates incoming webhooks
-- **CORS protection**: Configurable origins
-- **Helmet.js**: Security headers
-- **Input validation**: All inputs validated
-- **Error sanitization**: No sensitive data in responses
-
-## Troubleshooting
+## 🆘 Troubleshooting
 
 ### Common Issues
 
-1. **Bot not responding**
-   - Check `TELEGRAM_BOT_TOKEN` is correct
-   - Verify Bot Service is running
-   - Check logs for errors
-
-2. **Webhook not working**
-   - Ensure `WEBHOOK_URL` is HTTPS
-   - Verify webhook is set up: `GET /bot-info`
-   - Check webhook secret matches
-
-3. **Bot Service connection failed**
-   - Verify `BOT_SERVICE_URL` is correct
-   - Check Bot Service health: `GET {BOT_SERVICE_URL}/health`
-   - Review network connectivity
+| Issue | Solution |
+|-------|----------|
+| Bot not responding | Check `TELEGRAM_BOT_TOKEN` |
+| Webhook fails | Verify `WEBHOOK_URL` is HTTPS |
+| Bot service unreachable | Check `BOT_SERVICE_URL` |
+| Messages not processed | Check bot service logs |
 
 ### Debug Mode
-Set `NODE_ENV=development` for detailed debug logs.
 
-## Testing
-
-### Manual Testing
-1. Start both services
-2. Send message to your Telegram bot
-3. Check logs for message flow
-4. Verify expense is added to database
-
-### Using cURL
 ```bash
-# Test webhook endpoint
-curl -X POST https://your-domain.com/webhook \
-  -H "Content-Type: application/json" \
-  -d '{"update_id":1,"message":{"message_id":1,"from":{"id":123},"chat":{"id":123},"date":1234567890,"text":"test"}}'
+# Enable debug logging
+export LOG_LEVEL=debug
+npm run dev
 ```
 
-## License
+---
 
-MIT 
+**Built with TypeScript, Express, and Telegraf** 🚀 

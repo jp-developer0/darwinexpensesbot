@@ -1,13 +1,22 @@
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
+"""
+Telegram Expense Bot Service
+
+Main FastAPI application that handles expense message processing
+using Google Gemini AI and Supabase database integration.
+"""
+
 import logging
 from contextlib import asynccontextmanager
+from typing import Dict, Any
+
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import db
 from expense_processor import expense_processor
-from models import ProcessMessageRequest, ProcessMessageResponse, ErrorResponse
+from models import ProcessMessageRequest, ProcessMessageResponse
 
 # Configure logging
 logging.basicConfig(
@@ -19,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager for startup and shutdown events"""
+    """Application lifespan manager for startup and shutdown events."""
     # Startup
     logger.info("Starting Bot Service...")
     await db.connect()
@@ -36,8 +45,8 @@ async def lifespan(app: FastAPI):
 # Create FastAPI application
 app = FastAPI(
     title="Telegram Expense Bot Service",
-    description="Python service for processing expense messages using LangChain",
-    version="1.0.0",
+    description="AI-powered expense categorization service using Google Gemini",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -52,21 +61,29 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "bot-service"}
+async def health_check() -> Dict[str, str]:
+    """Health check endpoint."""
+    return {"status": "healthy", "service": "bot-service", "version": "2.0.0"}
 
 
 @app.post("/process-message", response_model=ProcessMessageResponse)
-async def process_message(request: ProcessMessageRequest):
+async def process_message(request: ProcessMessageRequest) -> ProcessMessageResponse:
     """
-    Process a message from a Telegram user to extract and store expense information
+    Process a message from a Telegram user to extract and store expense information.
+    
+    This endpoint:
+    1. Validates user authorization
+    2. Uses Google Gemini AI to analyze the message
+    3. Stores valid expenses in the database
     
     Args:
         request: ProcessMessageRequest containing message and telegram_id
         
     Returns:
         ProcessMessageResponse with success status and response message
+        
+    Raises:
+        HTTPException: For authentication errors or internal server errors
     """
     try:
         # Check if user is whitelisted
@@ -115,6 +132,9 @@ async def process_message(request: ProcessMessageRequest):
             category=expense_data.category
         )
         
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"Error processing message from {request.telegram_id}: {e}")
         raise HTTPException(
@@ -123,16 +143,19 @@ async def process_message(request: ProcessMessageRequest):
         )
 
 
-@app.post("/add-user", response_model=dict)
-async def add_user(telegram_id: str):
+@app.post("/add-user")
+async def add_user(telegram_id: str) -> Dict[str, Any]:
     """
-    Add a new user to the whitelist
+    Add a new user to the whitelist.
     
     Args:
         telegram_id: Telegram user ID to add
         
     Returns:
-        Created user information
+        Dict containing success message and user information
+        
+    Raises:
+        HTTPException: If user creation fails
     """
     try:
         # Check if user already exists
@@ -161,15 +184,18 @@ async def add_user(telegram_id: str):
 
 
 @app.get("/users/{telegram_id}")
-async def get_user(telegram_id: str):
+async def get_user(telegram_id: str) -> Dict[str, Any]:
     """
-    Get user information by Telegram ID
+    Get user information by Telegram ID.
     
     Args:
         telegram_id: Telegram user ID
         
     Returns:
-        User information if found
+        Dict containing user information
+        
+    Raises:
+        HTTPException: If user not found or retrieval fails
     """
     try:
         user = await db.get_user_by_telegram_id(telegram_id)
@@ -179,6 +205,7 @@ async def get_user(telegram_id: str):
         return {"user": user}
         
     except HTTPException:
+        # Re-raise HTTP exceptions
         raise
     except Exception as e:
         logger.error(f"Error getting user {telegram_id}: {e}")
@@ -189,10 +216,11 @@ async def get_user(telegram_id: str):
 
 
 if __name__ == "__main__":
+    logger.info(f"Starting server on {settings.bot_service_host}:{settings.bot_service_port}")
     uvicorn.run(
         "main:app",
         host=settings.bot_service_host,
         port=settings.bot_service_port,
-        reload=True,
+        reload=False,  # Changed to False for production
         log_level="info"
     ) 

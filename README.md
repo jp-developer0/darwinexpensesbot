@@ -1,142 +1,204 @@
-# Telegram Expense Bot
+# Telegram Expense Bot 💰
 
-A Telegram chatbot system that facilitates adding expenses to a database through natural language messages.
+A modern Telegram chatbot system that uses **Google Gemini AI** to analyze and categorize expenses through natural language messages.
 
-## Architecture
+## ✨ Features
 
-The system consists of two services:
+- 🤖 **AI-Powered Categorization**: Uses Google Gemini 2.0 Flash for intelligent expense categorization
+- 📊 **Smart Categories**: Automatically categorizes expenses into Housing, Food, Transportation, etc.
+- 🔒 **User Whitelisting**: Secure access control
+- ☁️ **Cloud Database**: Uses Supabase for reliable data storage
+- 🐳 **Docker Ready**: Easy deployment with Docker Compose
+- 📱 **Natural Language**: Send messages like "Pizza $20" or "Gas station 45 dollars"
 
-- **Bot Service** (Python): Analyzes incoming messages using LangChain and LLM to extract expense details and categorize them
-- **Connector Service** (Node.js): Interfaces with Telegram API and forwards messages to the Bot Service
+## 🏗️ Architecture
 
-**Database**: Uses Supabase (hosted PostgreSQL) for data storage.
-
-## Services
-
-### [Bot Service](./bot-service)
-Python service that processes expense messages and stores them in Supabase.
-
-### [Connector Service](./connector-service)  
-Node.js service that handles Telegram webhook and communicates with the Bot Service.
-
-## Database Schema
-
-```sql
-CREATE TABLE users (
-  "id" SERIAL PRIMARY KEY,
-  "telegram_id" text UNIQUE NOT NULL
-);
-
-CREATE TABLE expenses (
-  "id" SERIAL PRIMARY KEY,
-  "user_id" integer NOT NULL REFERENCES users("id"),
-  "description" text NOT NULL,
-  "amount" money NOT NULL,
-  "category" text NOT NULL,
-  "added_at" timestamp NOT NULL
-);
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  Telegram Bot   │───▶│ Connector Service │───▶│   Bot Service   │
+│                 │    │    (Node.js)     │    │   (Python)      │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                                         │
+                                                         ▼
+                                               ┌─────────────────┐
+                                               │  Google Gemini  │
+                                               │       AI        │
+                                               └─────────────────┘
+                                                         │
+                                                         ▼
+                                               ┌─────────────────┐
+                                               │    Supabase     │
+                                               │   PostgreSQL    │
+                                               └─────────────────┘
 ```
 
-## Quick Start
+- **Connector Service**: Handles Telegram webhook and forwards messages
+- **Bot Service**: Processes messages using Gemini AI and stores in database
+- **Google Gemini**: Provides intelligent expense categorization
+- **Supabase**: Cloud PostgreSQL database for data persistence
 
-### 1. Prerequisites
-- Docker and Docker Compose (recommended)
-- OR: Python 3.11+, Node.js 18+
-- Telegram Bot Token (from @BotFather)
-- OpenAI API Key
-- Supabase account and project
+## 🚀 Quick Start
 
-### 2. Setup Supabase Database
+### Prerequisites
 
-1. Create a Supabase account at [supabase.com](https://supabase.com)
-2. Create a new project
-3. Go to the SQL Editor in your Supabase dashboard
-4. Copy and run the SQL commands from `supabase-setup.sql` to set up the database schema
-5. Get your database credentials from Project Settings > Database
+- Docker and Docker Compose
+- Google AI API key ([Get one here](https://makersuite.google.com/app/apikey))
+- Telegram Bot Token ([Create via @BotFather](https://t.me/botfather))
+- Supabase account ([Sign up here](https://supabase.com))
 
-### 3. Get Telegram Bot Token
-1. Message @BotFather on Telegram
-2. Send `/newbot` command
-3. Follow instructions to create your bot
-4. Copy the bot token
+### 1. Setup Supabase Database
 
-### 4. Setup with Docker (Recommended)
+1. Create a new Supabase project
+2. Go to SQL Editor in your dashboard
+3. Run the SQL commands from `supabase-setup.sql`
+4. Get your database credentials from Project Settings → Database
 
-1. Clone and setup:
+### 2. Configure Environment
+
 ```bash
-git clone <repository-url>
-cd telegram-expense-bot
-cp env.example .env
+cp .env.example .env
 ```
 
-2. Edit `.env` with your credentials:
+Edit `.env` with your credentials:
+
 ```env
+# Telegram Configuration
 TELEGRAM_BOT_TOKEN=your_bot_token_here
-OPENAI_API_KEY=your_openai_key_here
-DATABASE_URL=postgresql://postgres:YOUR_SUPABASE_PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres
 WEBHOOK_URL=https://your-domain.com/webhook  # Optional for production
+
+# AI Configuration  
+GOOGLE_API_KEY=your_google_api_key_here
+
+# Database Configuration
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres
+
+# Security
+WEBHOOK_SECRET=your_webhook_secret_here
 ```
 
-3. Start all services:
+### 3. Deploy
+
 ```bash
+# Start all services
 docker-compose up -d
-```
 
-4. Add yourself to the whitelist:
-```bash
+# Add yourself to whitelist (replace with your Telegram ID)
 curl -X POST "http://localhost:8000/add-user?telegram_id=YOUR_TELEGRAM_ID"
 ```
 
-### 5. Manual Setup (Alternative)
+### 4. Test
 
-1. Setup Bot Service:
+Send a message to your bot:
+- "Pizza $20" → Gets categorized as **Food**
+- "Gas station 45 dollars" → Gets categorized as **Transportation** 
+- "Rent payment 1200" → Gets categorized as **Housing**
+
+## 📋 Expense Categories
+
+The AI automatically categorizes expenses into:
+
+| Category | Examples |
+|----------|----------|
+| **Food** | Pizza, groceries, restaurants, coffee |
+| **Transportation** | Gas, car payments, taxi, parking |
+| **Housing** | Rent, mortgage, utilities, furniture |
+| **Entertainment** | Movies, games, concerts, streaming |
+| **Medical/Healthcare** | Doctor visits, medicine, dental |
+| **Education** | Tuition, books, courses |
+| **Utilities** | Electricity, water, internet |
+| **Insurance** | Health, car, home insurance |
+| **Savings** | Investments, savings accounts |
+| **Debt** | Loan payments, credit cards |
+| **Other** | Anything that doesn't fit above |
+
+## 🛠️ Development
+
+### Services
+
+- **Bot Service** (Python): [`./bot-service/`](./bot-service/)
+- **Connector Service** (Node.js): [`./connector-service/`](./connector-service/)
+
+### Local Development
+
 ```bash
+# Bot Service
 cd bot-service
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp env.example .env
-# Edit .env with your Supabase configuration
 python main.py
-```
 
-2. Setup Connector Service:
-```bash
+# Connector Service  
 cd connector-service
 npm install
-npm run build
-cp env.example .env
-# Edit .env with your configuration
-npm start
+npm run dev
 ```
 
-### 6. Testing
-1. Send a message to your Telegram bot: "Pizza $20"
-2. Bot should respond: "Food expense added ✅"
-3. Check logs and Supabase database for the recorded expense
+### Database Schema
 
-See individual service READMEs for detailed setup instructions.
+See [`supabase-setup.sql`](./supabase-setup.sql) for the complete database schema including:
+- Users table for whitelisting
+- Expenses table for transaction storage
+- Views for analytics
+- Row Level Security policies
 
-## Expense Categories
+## 🔧 Configuration
 
-The bot automatically categorizes expenses into:
-- Housing
-- Transportation  
-- Food
-- Utilities
-- Insurance
-- Medical/Healthcare
-- Savings
-- Debt
-- Education
-- Entertainment
-- Other
+### Environment Variables
 
-## Usage
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather | ✅ |
+| `GOOGLE_API_KEY` | Google AI API key | ✅ |
+| `DATABASE_URL` | Supabase PostgreSQL connection string | ✅ |
+| `WEBHOOK_URL` | Public URL for Telegram webhook | ⚠️ Production only |
+| `WEBHOOK_SECRET` | Security token for webhooks | ⚠️ Production only |
 
-Users send messages like:
-- "Pizza 20 bucks"
-- "Gas station $45"
-- "Rent payment 1200"
+### Docker Configuration
 
-The bot responds with: "[Category] expense added ✅" 
+The services use host networking mode for external API connectivity. Ports:
+- **Bot Service**: 8000
+- **Connector Service**: 3000
+
+## 📊 API Endpoints
+
+### Bot Service (`localhost:8000`)
+
+- `GET /health` - Health check
+- `POST /process-message` - Process expense message
+- `POST /add-user?telegram_id={id}` - Add user to whitelist
+- `GET /users/{telegram_id}` - Get user information
+
+### Connector Service (`localhost:3000`)
+
+- `GET /health` - Health check  
+- `POST /webhook` - Telegram webhook endpoint
+
+## 🔍 Monitoring
+
+Check service logs:
+
+```bash
+# View all logs
+docker-compose logs
+
+# View specific service
+docker-compose logs bot-service
+docker-compose logs connector-service
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+**Built with ❤️ using Google Gemini AI, Supabase, and Docker** 

@@ -1,99 +1,96 @@
-# Bot Service - Telegram Expense Bot
+# Bot Service 🤖
 
-Python service that processes expense messages using LangChain and OpenAI to extract expense details and store them in PostgreSQL.
+The Python backend service that powers the expense categorization using **Google Gemini AI**.
 
-## Features
+## 🚀 Features
 
-- 🤖 LangChain integration with OpenAI for intelligent expense extraction
-- 📊 Automatic expense categorization (Housing, Transportation, Food, etc.)
-- 🔐 User whitelist validation
-- 🐘 PostgreSQL database integration with connection pooling
-- ⚡ Async FastAPI with concurrent request handling
-- 📝 Comprehensive logging and error handling
-- 🛡️ Robust fallback mechanisms for expense parsing
+- **AI-Powered Analysis**: Uses Google Gemini 2.0 Flash for natural language understanding
+- **Structured Output**: Reliable expense data extraction with Pydantic models
+- **Smart Fallback**: Regex-based fallback when AI is unavailable
+- **User Management**: Whitelist-based access control
+- **Database Integration**: Async Supabase PostgreSQL operations
+- **Production Ready**: FastAPI with proper logging and error handling
 
-## Requirements
+## 🏗️ Architecture
 
-- Python 3.11+
-- PostgreSQL database
-- OpenAI API key
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   FastAPI App   │───▶│ Expense Processor │───▶│  Google Gemini  │
+│                 │    │   (LangChain)    │    │       AI        │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         │                                                │
+         ▼                                                ▼
+┌─────────────────┐                            ┌─────────────────┐
+│  Database Layer │                            │   Structured    │
+│   (Supabase)    │◀───────────────────────────│     Output      │
+└─────────────────┘                            └─────────────────┘
+```
 
-## Installation
+## 📁 Project Structure
 
-1. Create virtual environment:
+```
+bot-service/
+├── main.py              # FastAPI application
+├── expense_processor.py # AI-powered expense analysis
+├── database.py          # Database operations
+├── models.py            # Pydantic data models
+├── config.py            # Configuration management
+├── requirements.txt     # Python dependencies
+└── Dockerfile          # Container configuration
+```
+
+## 🛠️ Development
+
+### Local Setup
+
+1. **Install Dependencies**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+2. **Environment Configuration**
+   ```bash
+   export DATABASE_URL="postgresql://postgres:password@host:5432/postgres"
+   export GOOGLE_API_KEY="your_google_api_key"
+   export BOT_SERVICE_HOST="0.0.0.0"
+   export BOT_SERVICE_PORT="8000"
+   ```
+
+3. **Run the Service**
+   ```bash
+   python main.py
+   ```
+
+### Docker
+
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Build image
+docker build -t expense-bot-service .
+
+# Run container
+docker run -p 8000:8000 \
+  -e DATABASE_URL="your_database_url" \
+  -e GOOGLE_API_KEY="your_api_key" \
+  expense-bot-service
 ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
+## 📊 API Endpoints
+
+### Health Check
+```http
+GET /health
 ```
+Returns service status and version.
 
-3. Set up environment variables:
-```bash
-cp env.example .env
-# Edit .env with your configuration
-```
+### Process Message
+```http
+POST /process-message
+Content-Type: application/json
 
-## Configuration
-
-Create a `.env` file with the following variables:
-
-```env
-# Database Configuration
-DATABASE_URL=postgresql://username:password@localhost:5432/expense_bot
-
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key_here
-
-# Service Configuration
-BOT_SERVICE_HOST=0.0.0.0
-BOT_SERVICE_PORT=8000
-```
-
-## Database Setup
-
-Create the required tables in your PostgreSQL database:
-
-```sql
-CREATE TABLE users (
-  "id" SERIAL PRIMARY KEY,
-  "telegram_id" text UNIQUE NOT NULL
-);
-
-CREATE TABLE expenses (
-  "id" SERIAL PRIMARY KEY,
-  "user_id" integer NOT NULL REFERENCES users("id"),
-  "description" text NOT NULL,
-  "amount" money NOT NULL,
-  "category" text NOT NULL,
-  "added_at" timestamp NOT NULL
-);
-```
-
-## Running the Service
-
-### Development
-```bash
-python main.py
-```
-
-### Production
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-## API Endpoints
-
-### POST `/process-message`
-Process a message to extract expense information.
-
-**Request Body:**
-```json
 {
-  "message": "Pizza 20 bucks",
+  "message": "Pizza $20",
   "telegram_id": "123456789"
 }
 ```
@@ -108,116 +105,163 @@ Process a message to extract expense information.
 }
 ```
 
-### POST `/add-user`
-Add a user to the whitelist.
+### User Management
+```http
+# Add user to whitelist
+POST /add-user?telegram_id=123456789
 
-**Query Parameter:**
-- `telegram_id`: Telegram user ID to add
+# Get user info
+GET /users/123456789
+```
 
-**Response:**
-```json
+## 🧠 AI Processing
+
+### Google Gemini Integration
+
+The service uses **Google Gemini 2.0 Flash** for expense analysis:
+
+- **Model**: `gemini-2.0-flash-exp`
+- **Temperature**: 0.1 (for consistent categorization)
+- **Output**: Structured Pydantic models
+- **Fallback**: Regex-based amount extraction
+
+### Categories
+
+| Category | Description |
+|----------|-------------|
+| **Food** | Restaurants, groceries, delivery |
+| **Transportation** | Gas, car payments, public transport |
+| **Housing** | Rent, mortgage, utilities |
+| **Entertainment** | Movies, games, streaming |
+| **Medical/Healthcare** | Doctor visits, medicine |
+| **Education** | Tuition, books, courses |
+| **Utilities** | Electricity, water, internet |
+| **Insurance** | Health, car, home insurance |
+| **Savings** | Investments, retirement |
+| **Debt** | Loan payments, credit cards |
+| **Other** | Miscellaneous expenses |
+
+### Example Processing
+
+```python
+# Input: "Coffee at Starbucks $5.50"
+# Output:
 {
-  "message": "User added successfully",
-  "user": {
-    "id": 1,
-    "telegram_id": "123456789"
-  }
+  "is_expense": true,
+  "description": "Coffee at Starbucks",
+  "amount": 5.50,
+  "category": "Food"
 }
 ```
 
-### GET `/users/{telegram_id}`
-Get user information by Telegram ID.
+## 🗄️ Database Operations
 
-### GET `/health`
-Health check endpoint.
+### Async Database Layer
 
-## Expense Categories
+- **Connection**: Async PostgreSQL with asyncpg
+- **ORM**: Custom async database layer
+- **SSL**: Configured for Supabase connections
+- **Connection Pooling**: Efficient resource management
 
-The service automatically categorizes expenses into:
+### Key Operations
 
-- **Housing**: Rent, mortgage, utilities related to housing
-- **Transportation**: Gas, public transport, car maintenance
-- **Food**: Groceries, restaurants, food delivery
-- **Utilities**: Electricity, water, internet, phone
-- **Insurance**: Health, car, home insurance
-- **Medical/Healthcare**: Doctor visits, medications, medical bills
-- **Savings**: Investments, savings deposits
-- **Debt**: Loan payments, credit card payments
-- **Education**: Tuition, books, courses
-- **Entertainment**: Movies, games, subscriptions
-- **Other**: Everything else
+```python
+# User management
+await db.create_user(telegram_id)
+await db.get_user_by_telegram_id(telegram_id)
+await db.is_user_whitelisted(telegram_id)
 
-## LangChain Integration
-
-The service uses LangChain with OpenAI's GPT-3.5-turbo-instruct to:
-
-1. Analyze if a message contains an expense
-2. Extract expense description, amount, and category
-3. Provide fallback parsing for robustness
-
-### Example Message Processing
-
-- Input: "Pizza 20 bucks"
-- Output: `{"is_expense": true, "description": "Pizza", "amount": 20.0, "category": "Food"}`
-
-## Error Handling
-
-- **Non-whitelisted users**: Returns access denied message
-- **Invalid messages**: Returns helpful guidance
-- **LLM parsing failures**: Falls back to regex-based extraction
-- **Database errors**: Proper error logging and HTTP status codes
-
-## Logging
-
-Comprehensive logging includes:
-- User whitelist checks
-- Expense extraction results
-- Database operations
-- Error conditions with stack traces
-
-## Development
-
-### Running Tests
-```bash
-# Add your test commands here
-pytest
+# Expense management
+await db.add_expense(user_id, description, amount, category)
 ```
 
-### Code Style
+## ⚙️ Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | Supabase PostgreSQL connection string | Required |
+| `GOOGLE_API_KEY` | Google AI API key | Required |
+| `BOT_SERVICE_HOST` | Service bind address | `0.0.0.0` |
+| `BOT_SERVICE_PORT` | Service port | `8000` |
+
+### SSL Configuration
+
+For Supabase connections, SSL is automatically configured:
+```python
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
+```
+
+## 🔍 Monitoring & Debugging
+
+### Logging
+
+The service provides comprehensive logging:
+- **INFO**: Normal operations and successful processing
+- **WARNING**: Fallback processing and validation issues
+- **ERROR**: Failures and exceptions
+
+### Health Monitoring
+
 ```bash
-# Format code
+# Check service health
+curl http://localhost:8000/health
+
+# Expected response
+{
+  "status": "healthy",
+  "service": "bot-service",
+  "version": "2.0.0"
+}
+```
+
+## 🧪 Testing
+
+### Manual Testing
+
+```bash
+# Add test user
+curl -X POST "http://localhost:8000/add-user?telegram_id=123456789"
+
+# Test expense processing
+curl -X POST "http://localhost:8000/process-message" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Pizza $20", "telegram_id": "123456789"}'
+```
+
+### Expected Behavior
+
+- ✅ "Pizza $20" → Food category
+- ✅ "Gas station 45 dollars" → Transportation
+- ✅ "Rent payment 1200" → Housing
+- ❌ "Hello there" → Not an expense
+
+## 🔧 Dependencies
+
+### Core Dependencies
+
+- **FastAPI**: Modern web framework
+- **LangChain**: AI orchestration framework
+- **Google Generative AI**: Gemini model integration
+- **Pydantic**: Data validation and parsing
+- **asyncpg**: Async PostgreSQL driver
+- **uvicorn**: ASGI server
+
+### Development
+
+```bash
+# Install development dependencies
+pip install -r requirements.txt
+
+# Code formatting (optional)
+pip install black isort
 black .
-flake8 .
+isort .
 ```
 
-## Deployment
+---
 
-### Using Docker
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-### Environment Variables for Production
-- Set `DATABASE_URL` to your production PostgreSQL instance
-- Use a secure `OPENAI_API_KEY`
-- Configure appropriate `BOT_SERVICE_HOST` and `BOT_SERVICE_PORT`
-
-## Monitoring
-
-The service provides:
-- Health check endpoint at `/health`
-- Comprehensive logging for monitoring
-- Error tracking and reporting
-
-## Security
-
-- User whitelist validation prevents unauthorized access
-- No sensitive data logged
-- Proper error handling prevents information leakage 
+**Built with Google Gemini AI and FastAPI** 🚀 
