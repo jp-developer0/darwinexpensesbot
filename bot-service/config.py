@@ -6,8 +6,11 @@ class Settings(BaseSettings):
     # Database Configuration
     database_url: str
     
-    # OpenAI Configuration
-    openai_api_key: str
+    # OpenAI Configuration (kept for backward compatibility)
+    openai_api_key: Optional[str] = None
+    
+    # Google Gemini Configuration
+    google_api_key: str
     
     # Service Configuration
     bot_service_host: str = "0.0.0.0"
